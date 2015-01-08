@@ -1,0 +1,35 @@
+title: Monitor FibreChannel ports using FIBRE-CHANNEL-FE-MIB::fcFeModuleTable
+agents: snmp
+author: Jeremy Leggat <jleggat@asu.edu>
+license: GPL
+distribution:
+description:
+  This checks monitors a FibreChannel port of switch using FIBRE-CHANNEL-FE-MIB.
+  The check goes critical under the following conditions:
+
+  {[1]} The unit returns status that is not in the allowed states ("online" by default).
+
+  Polls the .1.3.6.1.2.1.75.1.1.4 oid, FIBRE-CHANNEL-FE-MIB::fcFeModuleTable
+  "A table that contains, one unit for each module in the Fabric Element, information of the modules."
+
+item:
+  The item is the array index in returned data.
+
+examples:
+  # Generally turn on averaging with 15 Minutes on all ports:
+  fc_unit_default_levels["warn_states"] =  [ "testing", "offline" ]
+
+perfdata:
+
+inventory:
+  The inventory creates a check check for each chassis.
+
+[parameters]
+parameters (dict): This check works with dictionary based parameters. The
+ following keys are allowed:
+
+  {"allowed_states"}: Status returned from chassis that returns OK.  Defaults to "online".
+
+  {"warn_states"}: Status that triggers warning, default is "testing".
+
+[configuration]

@@ -24,69 +24,50 @@
 # to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
 # Boston, MA 02110-1301 USA.
 
-# Author: Jeremy Leggat <jleggat@asu.edu>
-# --------------------------------------------------------------------------------
-# 1. Fibre Channel physical info
-# Polls the .1.3.6.1.2.1.75.1.2.2.1 oid, FIBRE-CHANNEL-FE-MIB::fcFxPortPhysTable
-# "A table that contains, one entry for each FxPort in the Fabric Element, physical level
-#    status and parameters of the FxPorts."
-# .1.3.6.1.2.1.75.1.1.5.1 fcFxPortTable
-# .1.3.6.1.2.1.75.1.2.1.1 fcFxPortStatusTable
-# .1.3.6.1.2.1.75.1.2.2.1 fcFxPortPhysTable
-# .1.3.6.1.2.1.75.1.2.3.1	fcFxLoginTable
-# fcFeError
-# .1.3.6.1.2.1.75.1.3.1.1	fcFxPortErrorTable
-# fcFeAccounting
-# .1.3.6.1.2.1.75.1.4.1.1	fcFxPortC1AccountingTable
-# .1.3.6.1.2.1.75.1.4.2.1	fcFxPortC2AccountingTable
-# .1.3.6.1.2.1.75.1.4.3.1	fcFxPortC3AccountingTable
 
 factory_settings["fc_port_default_levels"] = {
     "operstatus"			: [ 1, 2 ],
     "adminstatus"			: [ 1, 2 ],
     "assumed_speed"			: 4,
-    "C3Discards"			: (3.0, 20.0), # allowed percentage of CRC errors
-    "LinkFailures"			: (3.0, 20.0), # allowed percentage of Enc-OUT Frames
-    "SyncLosses"			: (3.0, 20.0), # allowed percentage of No Tx Credits
-    "PrimSeqProtoErrors"	: (3.0, 20.0), # allowed percentage of CRC errors
-    "InvalidTxWords"		: (3.0, 20.0), # allowed percentage of CRC errors
-    "InvalidCrcs"			: (3.0, 20.0), # allowed percentage of Enc-OUT Frames
-    "AddressIdErrors"		: (3.0, 20.0), # allowed percentage of No Tx Credits
-    "LinkResetIns"			: (3.0, 20.0), # allowed percentage of CRC errors
-    "LinkResetOuts"			: (3.0, 20.0), # allowed percentage of CRC errors
-    "OlsIns"				: (3.0, 20.0), # allowed percentage of Enc-OUT Frames
-    "OlsOuts"				: (3.0, 20.0), # allowed percentage of No Tx Credits
+    "C3Discards"			: (3.0, 20.0),
+    "LinkFailures"			: (3.0, 20.0),
+    "SyncLosses"			: (3.0, 20.0),
+    "PrimSeqProtoErrors"	        : (3.0, 20.0),
+    "InvalidTxWords"		        : (3.0, 20.0),
+    "InvalidCrcs"			: (3.0, 20.0),
+    "AddressIdErrors"		        : (3.0, 20.0),
+    "LinkResetIns"			: (3.0, 20.0),
+    "LinkResetOuts"			: (3.0, 20.0),
+    "OlsIns"				: (3.0, 20.0),
+    "OlsOuts"				: (3.0, 20.0),
 }
 
-# lookup tables for check implementation
 fc_port_opermode = [ '', "unknown", "fPort", "flPort" ]
 fc_port_adminstatus = [ '', "online", "offline", "testing" ]
 fc_port_operstatus = [ '', "online", "offline", "testing", "linkFailure" ]
 fc_port_speed     = [ '', '1Gbit', '2Gbit', 'auto-Neg', '4Gbit', '8Gbit', '10Gbit', ]
 
-# settings for inventory: which ports should be inventorized
 fc_port_inventory_opermode  = [ "2", "3", ]
+
 
 def inventory_fc_port(checkname, info):
   return [('.'.join(str(x) for x in (ord(byte) for byte in line[0])),{}) for line in info
     if line[1] in fc_port_inventory_opermode]
 
+ 
 def check_fc_port(item, params, info):
   portinfo = (line[::-1] for line in info if item in '.'.join(str(x) for x in (ord(byte) for byte in line[0])) )
 
-  # Performance counters
-  summarystate = 0
-  output = []
+  worst_state = 0
+  infotext = []
   perfdata = []
 
-  # Lookup port speed as set in params, I haven't figured out how to get this from snmp.
   gbit = params.get("assumed_speed")
   speedmsg = ("assuming %gGbit/s" % gbit)
-  output.append(speedmsg)
-  # convert gbit netto link-rate to Byte/s (8/10 enc)
+  infotext.append(speedmsg)
+ 
   wirespeed = gbit * 1000000000.0 * 0.8 / 8
 
-  # Now check rates of various error counters
   this_time = time.time()
   try:
     c3discards, c3outoctets, c3inoctets, c3outframes, c3inframes, olsouts, olsins, linkresetouts, linkresetins, \
@@ -96,30 +77,26 @@ def check_fc_port(item, params, info):
     timedif, inoctets_rate = get_counter("fc.C3InOctets.%s" % item, this_time, c3inoctets)
     timedif, outoctets_rate = get_counter("fc.C3OutOctets.%s" % item, this_time, c3outoctets)
 
-    average = params.get("average") # range in minutes
+    average = params.get("average")
 
-    #Bandwidth
-    # convert thresholds in percentage into MB/s
     bw_thresh = params.get("bw")
-    if bw_thresh == None: # no levels
+    if bw_thresh == None:
       warn_bytes, crit_bytes = None, None
     else:
       warn, crit = bw_thresh
       if type(warn) == float:
         warn_bytes = wirespeed * warn / 100.0
-      else: # in MB
+      else:
         warn_bytes = warn * 1048576.0
         if type(crit) == float:
           crit_bytes = wirespeed * crit / 100.0
-        else: # in MB
+        else:
           crit_bytes = crit * 1048576.0
 
     for what, value in [("In", inoctets_rate), ("Out", outoctets_rate)]:
-      output.append("%s: %s/s" % (what, get_bytes_human_readable(value)))
+      infotext.append("%s: %s/s" % (what, get_bytes_human_readable(value)))
       perfdata.append((what, value, warn_bytes, crit_bytes, 0, wirespeed))
 
-    # RX Frames & TX Frames
-    # Put number of frames into performance data
     timedif, inframes_rate = get_counter("fc_port.c3inframes.%s" % item, this_time, c3inframes)
     timedif, outframes_rate = get_counter("fc_port.c3outframes.%s" % item, this_time, c3outframes)
     totalframes_rate = inframes_rate + outframes_rate
@@ -142,7 +119,7 @@ def check_fc_port(item, params, info):
 
       timedif, per_sec = get_counter("fc.%s.%s" % (desc, item), this_time, counter)
       perfdata.append( (desc, per_sec) )
-      # compute error rate (errors in relation to number of frames) (from 0.0 to 1.0)
+  
       if ref > 0 or per_sec > 0:
         rate = per_sec / (ref + per_sec)
       else:
@@ -152,13 +129,11 @@ def check_fc_port(item, params, info):
       error_percentage = rate * 100.0
       warn, crit = params[desc]
       if crit != None and error_percentage >= crit:
-        summarystate = 2
-        text += "(!!)"
-        output.append(text)
+        worst_state = max(2, worst_state)
+        infotext.append(text)
       elif warn != None and error_percentage >= warn:
-        summarystate = max(1, summarystate)
-        text += "(!)"
-        output.append(text)
+        worst_state = max(1, worst_state)
+        infotext.append(text)
 
   except MKCounterWrapped, e:
     for counter, value in [( "C3InOctets", c3inoctets ),
@@ -172,27 +147,27 @@ def check_fc_port(item, params, info):
         get_counter("fc_port.%s.%s" % (counter, item), this_time, value)
       except MKCounterWrapped, e:
         pass
-    perfdata = [] # perfdata might not be valid
+    perfdata = [] 
 
-# continue after all counters are handled
-
-  errorflag = ""
   if params.get("operstatus") == None or operstatus in params["operstatus"]:
     pass
   else:
-    errorflag = "(!!)"
-    summarystate = 2
-  output.append("Oper:%s(%d)%s" % (fc_port_operstatus[operstatus], operstatus, errorflag))
+    worst_state = max(2, worst_state)
+  infotext.append("Oper:%s(%d)%s" % (fc_port_operstatus[operstatus], operstatus))
 
-  errorflag = ""
   if params.get("adminstatus") == None or adminstatus in params["adminstatus"]:
     pass
   else:
-    errorflag = "(!!)"
-    summarystate = 2
-  output.append("Admin:%s(%d)%s" % (fc_port_adminstatus[adminstatus], adminstatus, errorflag))
+    worst_state = max(2, worst_state)
+  infotext.append("Admin:%s(%d)" % (fc_port_adminstatus[adminstatus], adminstatus))
 
-  return (summarystate, '%s - %s' % (nagios_state_names[summarystate], ', '.join(output)), perfdata)
+  if worst_state == 1:
+    infotext[-1] += "(!)"
+  elif worst_state == 2:
+    infotext[-1] += "(!!)"
+
+  return (worst_state, '%s - %s' % (nagios_state_names[worst_state], ', '.join(infotext)), perfdata)
+
 
 check_info["fc_port"] = {
     "inventory_function"       : inventory_fc_port,
@@ -200,30 +175,9 @@ check_info["fc_port"] = {
     "has_perfdata"             : True,
     "service_description"      : "FC Port %s",
     "default_levels_variable"  : "fc_port_default_levels",
+    'snmp_info'                : ( ".1.3.6.1.2.1.75.1", [ "2.1.1.1", "2.1.1.3", "2.2.1.1", "2.2.1.2", "3.1.1.1", "3.1.1.2",
+                                   "3.1.1.4", "3.1.1.5", "3.1.1.6", "3.1.1.8", "3.1.1.12", "4.3.1.1", "4.3.1.2", "4.3.1.3",
+                                   "4.3.1.4", "4.3.1.5", ] ),
+    "snmp_scan_function"        : lambda oid: oid(".1.3.6.1.2.1.75.1.1.1.0") != None,
 }
 
-snmp_info["fc_port"] = \
-	( ".1.3.6.1.2.1.75.1", [
-		"2.1.1.1",	# fcFxPortID					Hex-STRING
-		"2.1.1.3",	# fcFxPortOperMode				unknown(1), fPort(2), flPort(3)
-		"2.2.1.1",	# fcFxPortPhysAdminStatus		online(1), offline(2), testing(3)
-		"2.2.1.2",	# fcFxPortPhysOperStatus		online(1), offline(2), testing(3), linkFailure(4)
-		"3.1.1.1",	# fcFxPortLinkFailures			Gauge32
-		"3.1.1.2",	# fcFxPortSyncLosses			Gauge32
-		"3.1.1.4",	# fcFxPortPrimSeqProtoErrors	Gauge32
-		"3.1.1.5",	# fcFxPortInvalidTxWords		Gauge32
-		"3.1.1.6",	# fcFxPortInvalidCrcs			Gauge32
-		"3.1.1.8",	# fcFxPortAddressIdErrors		Gauge32
-		"3.1.1.9",	# fcFxPortLinkResetIns			Gauge32
-		"3.1.1.10",	# fcFxPortLinkResetOuts			Gauge32
-		"3.1.1.11",	# fcFxPortOlsIns				Gauge32
-		"3.1.1.12",	# fcFxPortOlsOuts				Gauge32
-		"4.3.1.1",	# fcFxPortC3InFrames			Gauge32
-		"4.3.1.2",	# fcFxPortC3OutFrames			Gauge32
-		"4.3.1.3",	# fcFxPortC3InOctets			Gauge32
-		"4.3.1.4",	# fcFxPortC3OutOctets			Gauge32
-		"4.3.1.5",	# fcFxPortC3Discards			Gauge32
-	] )
-
-snmp_scan_functions['fc_port'] = \
-    lambda oid: oid(".1.3.6.1.2.1.75.1.1.1.0") != None

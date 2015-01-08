@@ -2,31 +2,30 @@ title: Monitor FibreChannel ports using FIBRE-CHANNEL-FE-MIB::fcFxPortPhysTable
 agents: snmp
 author: Jeremy Leggat <jleggat@asu.edu>
 license: GPL
-distribution: check_mk
+distribution:
 description:
- This checks monitors a FibreChannel port of switch using FIBRE-CHANNEL-FE-MIB.
- The check goes critical under the following conditions:
+  This checks monitors a FibreChannel port of switch using FIBRE-CHANNEL-FE-MIB.
+  The check goes critical under the following conditions:
 
- {[1]} The physical state, operational state or adminstrative state of the port is not
- as expected.
+  {[1]} The physical state, operational state or adminstrative state of the port is not
+  as expected.
 
- {[2]} The current throughput exceeds certain absolute or
- percentual levels.
+  {[2]} The current throughput exceeds certain absolute or percentual levels.
 
- {[3]} An error counter exceeds its  configured levels (C3 Discards, Link Failures,
-   Sync Losses, Prime Sequence Protocol Errors, Invalid Text Words, Invalid CRCs,
-   Address Id Errors, Link Reset Ins, Ols Ins, Ols Outs)
+  {[3]} An error counter exceeds its  configured levels (C3 Discards, Link Failures,
+    Sync Losses, Prime Sequence Protocol Errors, Invalid Text Words, Invalid CRCs,
+    Address Id Errors, Link Reset Ins, Ols Ins, Ols Outs)
 
 item:
- The item is the switch-number.port-number, with port-number as two-digit or
- three-digit string (on switches with 100 or more ports).
+  The item is the switch-number.port-number, with port-number as two-digit or
+  three-digit string (on switches with 100 or more ports).
 
 examples:
- # Generally turn on averaging with 15 Minutes on all ports:
- brocade_fcport_default_levels["average"] = 15
+  # Generally turn on averaging with 15 Minutes on all ports:
+  fcport_default_levels["average"] = 15
 
- # Alternative: set all default parameters at once:
- fc_port_default_levels = {
+  # Alternative: set all default parameters at once:
+  fc_port_default_levels = {
     "operstatus"			: [ 2 ], # accept only online.
     "adminstatus"			: [ 2 ], # accept only online.
     "assumed_speed"			: 4,  # assume port is 4Gb/s
