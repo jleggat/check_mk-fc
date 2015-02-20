@@ -160,7 +160,7 @@ def check_fc_port(item, params, info):
       if fc_check_adminstate:
         if operstatus != adminstatus:
           worst_state = max(2, worst_state)
-          infotext.insert(0, "Operating status %s(%d) does not correspond with admin status %s(%d)" % (fc_port_operstatus[operstatus], operstatus, fc_port_adminstatus[adminstatus], adminstatus))
+          infotext.insert(0, "Operating status %s(%d) does not match admin status %s(%d)" % (fc_port_operstatus[operstatus], operstatus, fc_port_adminstatus[adminstatus], adminstatus))
 
       if fc_inventory_monitor_state and operstatus == params.get("state"):
         pass

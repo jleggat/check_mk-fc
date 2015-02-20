@@ -27,7 +27,6 @@ examples:
   # Alternative: set all default parameters at once:
   fc_port_default_levels = {
     "operstatus"			: [ 2 ], # accept only online.
-    "adminstatus"			: [ 2 ], # accept only online.
     "assumed_speed"			: 4,  # assume port is 4Gb/s
     "C3Discards"			: (5.0, 10.0), # allowed percentage of CRC errors
     "LinkFailures"			: (5.0, 20.0), # allowed percentage of Enc-OUT Frames
